@@ -264,6 +264,7 @@
     prodMainSplide: null,
     prodThumbsSplide: null,
     currentProduct: null,
+    store: null,
     editingCartIndex: null,
     loading: {
       store: true,
@@ -504,6 +505,7 @@
         store = data || {};
         cacheSet('stores:first', store, 60 * 60 * 1000); // 60m
       }
+      state.store = store;
       el.storeName.textContent = store.name || 'المتجر';
       el.footerStoreName.textContent = store.name || 'المتجر';
       if(store.logo_url){
@@ -1620,6 +1622,8 @@
   }
 
   function buildTopicFromStoreName(){
+    const fixed = (window.STORE_TOPIC || '').trim();
+    if(fixed) return fixed;
     const name = (state.store?.name || 'rowad').trim();
     // Encode to be topic-safe. FCM allows [a-zA-Z0-9-_.~%]
     const enc = encodeURIComponent(name);
@@ -1630,17 +1634,27 @@
   async function notifyNewOrder(order, items){
     try{
       const topic = buildTopicFromStoreName();
+      const title = `${(state.store?.name || 'المتجر')} - طلب جديد`;
+      const body = `طلب رقم ${order.id} | طاولة ${order.table_number ?? '-'} | عناصر ${Array.isArray(items) ? items.length : 0}`;
       const payload = {
         topic,
-        title: 'طلب جديد',
-        body: `رقم طاولة ${order.table_number} - عدد عناصر ${items.length}`,
+        title,
+        body,
         order_id: order.id,
         table_number: order.table_number,
         customer_name: order.customer_name || '',
       };
-      const base = window.NEW_ORDER_FUNCTION_URL_BASE || 'https://fwqickaaqqcynpzuwdso.functions.supabase.co';
-      const url = `${base}/notify-new-order`;
-      await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const directUrl = window.NEW_ORDER_FUNCTION_URL || '';
+      const funcName = window.NEW_ORDER_FUNCTION_NAME || 'super-responder';
+      const base = window.NEW_ORDER_FUNCTION_URL_BASE || window.SUPABASE_URL;
+      const url = directUrl || `${base}/functions/v1/${funcName}`;
+      const headers = { 'Content-Type': 'application/json' };
+      if(url.includes('.supabase.co/functions/v1/')){
+        // Call via Supabase Functions gateway requires anon auth
+        headers['Authorization'] = `Bearer ${window.SUPABASE_ANON_KEY}`;
+        headers['apikey'] = window.SUPABASE_ANON_KEY;
+      }
+      await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
     }catch(e){ console.warn('notifyNewOrder failed', e); }
   }
 
