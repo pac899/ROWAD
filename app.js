@@ -1615,6 +1615,33 @@
     setCartState([]);
     updateCartUI();
     toast('تم إنشاء الطلب بنجاح');
+    // Fire staff notification via Supabase Edge Function (topic = store name)
+    try{ await notifyNewOrder(order, items); }catch(_){ }
+  }
+
+  function buildTopicFromStoreName(){
+    const name = (state.store?.name || 'rowad').trim();
+    // Encode to be topic-safe. FCM allows [a-zA-Z0-9-_.~%]
+    const enc = encodeURIComponent(name);
+    // Collapse consecutive percent signs just in case
+    return enc.replace(/%{2,}/g, '%');
+  }
+
+  async function notifyNewOrder(order, items){
+    try{
+      const topic = buildTopicFromStoreName();
+      const payload = {
+        topic,
+        title: 'طلب جديد',
+        body: `رقم طاولة ${order.table_number} - عدد عناصر ${items.length}`,
+        order_id: order.id,
+        table_number: order.table_number,
+        customer_name: order.customer_name || '',
+      };
+      const base = window.NEW_ORDER_FUNCTION_URL_BASE || 'https://fwqickaaqqcynpzuwdso.functions.supabase.co';
+      const url = `${base}/notify-new-order`;
+      await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    }catch(e){ console.warn('notifyNewOrder failed', e); }
   }
 
   function getCartState(){
