@@ -1634,11 +1634,21 @@
   async function notifyNewOrder(order, items){
     try{
       const topic = buildTopicFromStoreName();
-      const names = Array.isArray(items) ? items.map(i => i?.product_name || i?.name).filter(Boolean) : [];
-      const uniq = Array.from(new Set(names));
-      const top = uniq.slice(0, 2).join('، ');
-      const title = `طلب جديد${top ? ' - ' + top : ''}`;
-      const body = `${order.customer_name || 'عميل'} • طلب رقم ${order.id} • طاولة ${order.table_number ?? '-'} • ${Array.isArray(items) ? items.length : 0} عنصر`;
+      const firstItem = (Array.isArray(items) && items.length > 0) ? items[0] : null;
+      const firstName = firstItem ? (firstItem.product_name || firstItem.name || '') : '';
+      const firstQty = firstItem ? (firstItem.quantity || firstItem.qty || 1) : 1;
+      const title = firstName ? `${firstName} x${firstQty}` : 'طلب جديد';
+
+      const itemsDesc = Array.isArray(items)
+        ? items.map(i => {
+            const n = i?.product_name || i?.name || '';
+            const q = i?.quantity || i?.qty || 1;
+            const comps = Array.isArray(i?.options) && i.options.length ? ` (${i.options.join(', ')})` : '';
+            return `${n} x${q}${comps}`;
+          }).join('، ')
+        : '';
+      const customer = order.customer_name || 'عميل';
+      const body = itemsDesc ? `${itemsDesc} - ${customer}` : customer;
       const payload = {
         topic,
         title,
@@ -1656,9 +1666,12 @@
       if(url.includes('.supabase.co/functions/v1/')){
         // Call via Supabase Functions gateway requires anon auth
         headers['Authorization'] = `Bearer ${window.SUPABASE_ANON_KEY}`;
-        headers['apikey'] = window.SUPABASE_ANON_KEY;
       }
-      await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload), mode: 'cors' });
+      if(!res.ok){
+        const txt = await res.text().catch(()=> '');
+        throw new Error(`HTTP ${res.status}: ${txt}`);
+      }
     }catch(e){ console.warn('notifyNewOrder failed', e); }
   }
 
