@@ -1634,8 +1634,11 @@
   async function notifyNewOrder(order, items){
     try{
       const topic = buildTopicFromStoreName();
-      const title = `${(state.store?.name || 'المتجر')} - طلب جديد`;
-      const body = `طلب رقم ${order.id} | طاولة ${order.table_number ?? '-'} | عناصر ${Array.isArray(items) ? items.length : 0}`;
+      const names = Array.isArray(items) ? items.map(i => i?.product_name || i?.name).filter(Boolean) : [];
+      const uniq = Array.from(new Set(names));
+      const top = uniq.slice(0, 2).join('، ');
+      const title = `طلب جديد${top ? ' - ' + top : ''}`;
+      const body = `${order.customer_name || 'عميل'} • طلب رقم ${order.id} • طاولة ${order.table_number ?? '-'} • ${Array.isArray(items) ? items.length : 0} عنصر`;
       const payload = {
         topic,
         title,
@@ -1644,10 +1647,11 @@
         table_number: order.table_number,
         customer_name: order.customer_name || '',
       };
-      const directUrl = window.NEW_ORDER_FUNCTION_URL || '';
-      const funcName = window.NEW_ORDER_FUNCTION_NAME || 'super-responder';
+      // Use configured function URL first (prefer public functions domain to avoid CORS headers)
+      const configured = window.NEW_ORDER_FUNCTION_URL || '';
+      const funcName = window.NEW_ORDER_FUNCTION_NAME || 'notify-new-order';
       const base = window.NEW_ORDER_FUNCTION_URL_BASE || window.SUPABASE_URL;
-      const url = directUrl || `${base}/functions/v1/${funcName}`;
+      const url = configured || `${base}/functions/v1/${funcName}`;
       const headers = { 'Content-Type': 'application/json' };
       if(url.includes('.supabase.co/functions/v1/')){
         // Call via Supabase Functions gateway requires anon auth
