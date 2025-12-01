@@ -289,7 +289,7 @@
   // Geolocation & Geofence helpers
   // -------------------------
   const GEOFENCE_CENTER = { lat: 35.955847, lon: 36.706773 };
-  const GEOFENCE_RADIUS_M = 60; // meters
+  const GEOFENCE_RADIUS_M = 30; // meters
 
   function toRad(d){ return d * Math.PI / 180; }
   function distanceMeters(lat1, lon1, lat2, lon2){
